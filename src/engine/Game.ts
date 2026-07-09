@@ -1,6 +1,7 @@
-import { Application, Container, Graphics, type Ticker } from "pixi.js";
+import { Application, Container, Graphics, Text, type Ticker } from "pixi.js";
 import { Keyboard } from "../input/Keyboard";
 import { Player } from "../entities/Player";
+import { Camera, type CameraMode } from "./Camera";
 
 /**
  * Game — 애플리케이션의 코어.
@@ -22,6 +23,12 @@ export class Game {
 
   private readonly keyboard = new Keyboard();
   private readonly player = new Player();
+  private readonly camera = new Camera(this.world);
+
+  // 현재 카메라 모드를 보여주는 라벨(hud에 고정). Text는 Stage 4에서 제대로 다룬다 — 여기선 미리보기.
+  private readonly label = new Text({
+    style: { fill: 0xffffff, fontSize: 15, fontFamily: "monospace" },
+  });
 
   async init(mount: HTMLElement): Promise<void> {
     await this.app.init({
@@ -44,23 +51,43 @@ export class Game {
     this.player.position.set(0, 0);
     this.world.addChild(this.player);
 
+    // HUD: 카메라 모드 라벨을 화면 좌상단에 고정.
+    this.label.position.set(12, 12);
+    this.hud.addChild(this.label);
+    this.setModeLabel(this.camera.mode);
+
+    // 카메라 모드 순환(C키). keydown은 OS 키반복으로 연속 발생하므로 e.repeat로 1회만.
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyC" && !e.repeat) {
+        this.setModeLabel(this.camera.cycle());
+      }
+    });
+
     this.app.ticker.add(this.update);
 
     console.info(
-      `[Game] renderer=${this.app.renderer.type === 1 ? "WebGL" : "WebGPU"} — WASD/화살표로 이동`,
+      `[Game] renderer=${this.app.renderer.type === 1 ? "WebGL" : "WebGPU"} — WASD 이동, C 카메라모드`,
     );
   }
 
   private update = (ticker: Ticker): void => {
-    // 1) 입력을 읽어 플레이어의 월드 좌표를 갱신
-    this.player.update(this.keyboard.direction(), ticker.deltaTime);
+    const dir = this.keyboard.direction();
 
-    // 2) 카메라: world를 플레이어의 반대 방향으로 밀어 플레이어를 화면 중앙에 고정.
-    //    world.x = (화면중앙) - (플레이어 월드 x)
-    //    → 플레이어가 오른쪽으로 갈수록 world는 왼쪽으로 밀려 배경이 스크롤된다.
-    this.world.x = this.app.screen.width / 2 - this.player.x;
-    this.world.y = this.app.screen.height / 2 - this.player.y;
+    // 1) 입력을 읽어 플레이어의 월드 좌표를 갱신
+    this.player.update(dir, ticker.deltaTime);
+
+    // 2) 카메라가 world를 어떻게 움직일지 결정(모드에 따라 다름).
+    this.camera.update(
+      this.player,
+      this.app.screen.width,
+      this.app.screen.height,
+      dir,
+    );
   };
+
+  private setModeLabel(mode: CameraMode): void {
+    this.label.text = `카메라: ${mode}   [C로 전환]  이동: WASD`;
+  }
 
   /** 월드 좌표계에 그린 정적 그리드. 카메라 이동의 기준점 역할. */
   private makeGrid(): Graphics {
