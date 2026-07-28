@@ -54,4 +54,5 @@ src/
 
 - [x] Stage 0 — 부트스트랩
 - [x] Stage 1 — 플레이어 이동 & 카메라 (world 역이동 방식)
-- [ ] Stage 2 — 스프라이트 & 애니메이션
+- [x] Stage 2 — 스프라이트 & 걷기 애니메이션 (코드 생성 스프라이트시트 + AnimatedSprite)
+- [ ] Stage 3 — 적 대량 스폰 & 추적

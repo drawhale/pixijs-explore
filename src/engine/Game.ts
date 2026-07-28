@@ -2,6 +2,7 @@ import { Application, Container, Graphics, Text, type Ticker } from "pixi.js";
 import { Keyboard } from "../input/Keyboard";
 import { Player } from "../entities/Player";
 import { Camera, type CameraMode } from "./Camera";
+import { loadWalkFrames } from "../assets/character";
 
 /**
  * Game — 애플리케이션의 코어.
@@ -22,8 +23,9 @@ export class Game {
   readonly hud = new Container();
 
   private readonly keyboard = new Keyboard();
-  private readonly player = new Player();
   private readonly camera = new Camera(this.world);
+  // 스프라이트 텍스처를 비동기로 로드한 뒤 생성하므로 init에서 할당한다.
+  private player!: Player;
 
   // 현재 카메라 모드를 보여주는 라벨(hud에 고정). Text는 Stage 4에서 제대로 다룬다 — 여기선 미리보기.
   private readonly label = new Text({
@@ -47,6 +49,9 @@ export class Game {
     // 그리드가 없으면 빈 배경이라 플레이어가 멈춰 있는 것처럼 보인다.
     this.world.addChild(this.makeGrid());
 
+    // 걷기 스프라이트시트를 비동기 로드한 뒤 플레이어 생성(Assets.load가 Promise라 await).
+    const walkFrames = await loadWalkFrames();
+    this.player = new Player(walkFrames);
     // 플레이어는 월드 원점(0,0)에서 시작. 카메라가 이를 화면 중앙에 놓는다.
     this.player.position.set(0, 0);
     this.world.addChild(this.player);
