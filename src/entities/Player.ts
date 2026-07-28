@@ -21,6 +21,7 @@ export class Player extends Container {
     super();
     this.sprite = new AnimatedSprite(walkFrames);
     this.sprite.anchor.set(0.5); // 프레임 중심을 원점에 정렬
+    this.sprite.tint = 0x00e5ff; // 흰색 텍스처에 시안색 입히기(적은 같은 텍스처를 빨강으로 tint)
     this.sprite.animationSpeed = 0.18; // 프레임 진행 속도(tick당)
     this.sprite.play();
     this.addChild(this.sprite);

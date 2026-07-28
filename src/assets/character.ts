@@ -29,15 +29,21 @@ function drawWalkCycleCanvas(): HTMLCanvasElement {
   return canvas;
 }
 
-/** 한 프레임(작은 생명체)을 그린다. t=0..1은 걷기 사이클 위상. 기본적으로 오른쪽을 본다. */
+/**
+ * 한 프레임(작은 생명체)을 그린다. t=0..1은 걷기 사이클 위상. 기본적으로 오른쪽을 본다.
+ *
+ * 중요: 몸통을 "흰색"으로 그린다 → tint로 어떤 색이든 입힐 수 있다(흰색×tint=tint).
+ * 시안으로 그렸다면 빨간 tint를 곱해도 어두워지기만 한다. 어두운 외곽선/눈은 tint를 곱해도
+ * 어둡게 유지되어 형태를 잡아준다.
+ */
 function drawFrame(ctx: CanvasRenderingContext2D, ox: number, t: number): void {
   const cx = ox + FRAME_W / 2;
   const groundY = FRAME_H - 8;
   const swing = Math.sin(t * Math.PI * 2) * 6; // 다리 앞뒤 흔들림
   const bob = Math.abs(Math.cos(t * Math.PI * 2)) * 2; // 위아래 반동
 
-  // 다리 두 개(반대 위상으로 흔들림)
-  ctx.strokeStyle = "#0a8ea0";
+  // 다리 두 개(반대 위상으로 흔들림) — 밝은 회색이라 tint가 색을 입힌다.
+  ctx.strokeStyle = "#c8d0dc";
   ctx.lineWidth = 5;
   ctx.lineCap = "round";
   const hipY = groundY - 14 - bob;
@@ -48,18 +54,18 @@ function drawFrame(ctx: CanvasRenderingContext2D, ox: number, t: number): void {
   ctx.lineTo(cx + 4 + swing, groundY);
   ctx.stroke();
 
-  // 몸통
+  // 몸통 — 흰색(tint로 색 결정). 외곽선은 어둡게(형태 유지).
   const bodyY = groundY - 20 - bob;
-  ctx.fillStyle = "#00e5ff";
-  ctx.strokeStyle = "#0a0a14";
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#1a1a24";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.ellipse(cx, bodyY, 11, 13, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // 눈(오른쪽 = 정면 방향)
-  ctx.fillStyle = "#0a0a14";
+  // 눈(오른쪽 = 정면 방향) — 어두워서 tint와 무관하게 눈으로 보인다.
+  ctx.fillStyle = "#1a1a24";
   ctx.beginPath();
   ctx.arc(cx + 5, bodyY - 3, 2.5, 0, Math.PI * 2);
   ctx.fill();
