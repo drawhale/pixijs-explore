@@ -4,6 +4,8 @@ import { Player } from "../entities/Player";
 import { Camera, type CameraMode } from "./Camera";
 import { loadWalkFrames } from "../assets/character";
 import { EnemyManager } from "./EnemyManager";
+import { ProjectileManager } from "./ProjectileManager";
+import { DamageNumbers } from "./DamageNumbers";
 
 /**
  * Game — 애플리케이션의 코어.
@@ -23,14 +25,18 @@ export class Game {
   /** 화면에 고정되는 UI 레이어(다음 스테이지에서 채운다). */
   readonly hud = new Container();
 
-  // 적 전용 레이어(플레이어 아래에 그려지도록 world에 먼저 추가).
+  // world 내부 레이어(그리기 순서: 아래 → 위).
   private readonly enemyLayer = new Container();
+  private readonly projectileLayer = new Container();
+  private readonly fxLayer = new Container(); // 데미지 숫자 등 최상단 이펙트
 
   private readonly keyboard = new Keyboard();
   private readonly camera = new Camera(this.world);
   // 스프라이트 텍스처를 비동기로 로드한 뒤 생성하므로 init에서 할당한다.
   private player!: Player;
   private enemies!: EnemyManager;
+  private projectiles!: ProjectileManager;
+  private damageNumbers!: DamageNumbers;
   private elapsed = 0; // 누적 틱(난이도 램프용)
 
   // HUD 라벨(hud에 고정). Text는 Stage 4에서 제대로 다룬다 — 여기선 미리보기.
@@ -58,18 +64,25 @@ export class Game {
     // 그리드가 없으면 빈 배경이라 플레이어가 멈춰 있는 것처럼 보인다.
     this.world.addChild(this.makeGrid());
 
-    // 그리기 순서: 그리드 → 적 레이어 → 플레이어 (플레이어가 적 위에 보이도록).
-    this.world.addChild(this.enemyLayer);
+    // 그리기 순서: 그리드 → 적 → 투사체 → 플레이어 → 이펙트(데미지 숫자).
+    this.world.addChild(this.enemyLayer, this.projectileLayer);
 
     // 걷기 스프라이트시트를 비동기 로드한 뒤 플레이어/적 생성(Assets.load가 Promise라 await).
     const walkFrames = await loadWalkFrames();
     this.player = new Player(walkFrames);
     // 플레이어는 월드 원점(0,0)에서 시작. 카메라가 이를 화면 중앙에 놓는다.
     this.player.position.set(0, 0);
-    this.world.addChild(this.player);
+    this.world.addChild(this.player, this.fxLayer);
 
     // 적: 플레이어와 같은 프레임 텍스처를 재활용(tint로 색만 변경) → 배칭됨.
     this.enemies = new EnemyManager(this.enemyLayer, walkFrames);
+    // 데미지 숫자(Text 풀링) → 투사체가 적을 맞히면 이 콜백으로 팝업.
+    this.damageNumbers = new DamageNumbers(this.fxLayer);
+    this.projectiles = new ProjectileManager(
+      this.projectileLayer,
+      this.enemies,
+      (x, y, dmg) => this.damageNumbers.spawn(x, y, dmg),
+    );
 
     // HUD: 라벨을 화면 좌상단에 고정.
     this.label.position.set(12, 12);
@@ -98,7 +111,7 @@ export class Game {
     // 1) 입력을 읽어 플레이어의 월드 좌표를 갱신
     this.player.update(dir, ticker.deltaTime);
 
-    // 2) 적: 스폰·추적·재활용
+    // 2) 적: 스폰·추적·플레이어 접촉 피해
     this.enemies.update(
       this.player,
       this.app.screen.width,
@@ -107,7 +120,13 @@ export class Game {
       this.elapsed,
     );
 
-    // 3) 카메라가 world를 어떻게 움직일지 결정(모드에 따라 다름).
+    // 3) 투사체: 자동 발사·이동·충돌(적 명중 시 데미지 숫자 콜백)
+    this.projectiles.update(this.player, ticker.deltaTime);
+
+    // 4) 데미지 숫자 팝업 갱신(떠오르며 페이드)
+    this.damageNumbers.update(ticker.deltaTime);
+
+    // 5) 카메라가 world를 어떻게 움직일지 결정(모드에 따라 다름).
     this.camera.update(
       this.player,
       this.app.screen.width,
@@ -115,8 +134,11 @@ export class Game {
       dir,
     );
 
-    // 4) HUD 통계 갱신. allocated(총 생성)가 active와 비슷하게 유지되면 풀링이 잘 도는 것.
-    this.stats.text = `적: ${this.enemies.activeCount}  (생성된 인스턴스: ${this.enemies.allocatedCount})  FPS: ${Math.round(this.app.ticker.FPS)}`;
+    // 6) HUD 갱신
+    this.stats.text =
+      `HP: ${Math.max(0, Math.round(this.player.hp))}/${this.player.maxHp}   ` +
+      `킬: ${this.enemies.killCount}   적: ${this.enemies.activeCount}   ` +
+      `탄: ${this.projectiles.activeCount}   FPS: ${Math.round(this.app.ticker.FPS)}`;
   };
 
   private setModeLabel(mode: CameraMode): void {

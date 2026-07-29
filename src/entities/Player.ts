@@ -13,9 +13,15 @@ import { AnimatedSprite, Container, type Texture } from "pixi.js";
  *
  * Container로 감싼 구조 덕분에 이동/카메라 코드(Stage 1)는 전혀 바뀌지 않았다.
  */
+export const PLAYER_MAX_HP = 100;
+
 export class Player extends Container {
   readonly speed = 4;
+  readonly maxHp = PLAYER_MAX_HP;
+  hp = PLAYER_MAX_HP;
+
   private readonly sprite: AnimatedSprite;
+  private invuln = 0; // 피격 후 무적 프레임(i-frame)
 
   constructor(walkFrames: Texture[]) {
     super();
@@ -27,7 +33,19 @@ export class Player extends Container {
     this.addChild(this.sprite);
   }
 
+  /**
+   * 피해를 입는다. 지속 접촉으로 순식간에 죽지 않도록 짧은 무적 프레임을 둔다.
+   * hp가 0이면 최대치로 회복(엔드리스 유지 — 제대로 된 게임오버 화면은 Stage 6).
+   */
+  hurt(amount: number): void {
+    if (this.invuln > 0) return;
+    this.hp -= amount;
+    this.invuln = 6;
+    if (this.hp <= 0) this.hp = this.maxHp;
+  }
+
   update(dir: { x: number; y: number }, delta: number): void {
+    if (this.invuln > 0) this.invuln -= delta;
     this.x += dir.x * this.speed * delta;
     this.y += dir.y * this.speed * delta;
 
