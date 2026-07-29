@@ -27,6 +27,8 @@ export class ProjectileManager {
     private readonly enemies: EnemyManager,
     /** 명중 지점에 데미지 숫자를 띄우는 콜백. */
     private readonly onHit: (x: number, y: number, damage: number) => void,
+    /** 적이 죽은 지점에서 이펙트(파티클·흔들림)를 내는 콜백. */
+    private readonly onKill: (x: number, y: number) => void,
   ) {}
 
   get activeCount(): number {
@@ -54,7 +56,10 @@ export class ProjectileManager {
       if (hit) {
         const dead = hit.takeDamage(DAMAGE);
         this.onHit(hit.x, hit.y, DAMAGE);
-        if (dead) this.enemies.kill(hit);
+        if (dead) {
+          this.onKill(hit.x, hit.y); // kill 전에 위치를 읽어 이펙트
+          this.enemies.kill(hit);
+        }
         this.despawn(i);
       } else if (p.life <= 0) {
         this.despawn(i);

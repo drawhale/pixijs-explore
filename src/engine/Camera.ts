@@ -30,7 +30,16 @@ export class Camera {
   /** lookahead에서 진행 방향으로 당기는 거리(월드 단위). */
   lookAhead = 140;
 
+  private shakeTime = 0; // 흔들림 남은 프레임
+  private shakeMag = 0; // 흔들림 세기(픽셀)
+
   constructor(private readonly world: Container) {}
+
+  /** 화면 흔들림 발동(더 센 요청이 오면 갱신). */
+  shake(magnitude: number, time = 12): void {
+    this.shakeMag = Math.max(this.shakeMag, magnitude);
+    this.shakeTime = Math.max(this.shakeTime, time);
+  }
 
   /**
    * 매 프레임 호출. target=플레이어 월드 좌표, dir=현재 이동 방향.
@@ -41,6 +50,7 @@ export class Camera {
     screenW: number,
     screenH: number,
     dir: { x: number; y: number },
+    delta: number,
   ): void {
     const cx = screenW / 2;
     const cy = screenH / 2;
@@ -66,6 +76,16 @@ export class Camera {
       // (학습용 단순화 — 엄밀히는 프레임률 보정이 필요하지만 감을 잡기엔 충분)
       this.world.x += (goalX - this.world.x) * this.smoothing;
       this.world.y += (goalY - this.world.y) * this.smoothing;
+    }
+
+    // 화면 흔들림: 기본 위치 위에 랜덤 오프셋을 얹는다(카메라 = world 오프셋의 응용).
+    if (this.shakeTime > 0) {
+      this.shakeTime -= delta;
+      const falloff = Math.max(0, this.shakeTime) / 12; // 점점 약해짐
+      const m = this.shakeMag * falloff;
+      this.world.x += (Math.random() - 0.5) * 2 * m;
+      this.world.y += (Math.random() - 0.5) * 2 * m;
+      if (this.shakeTime <= 0) this.shakeMag = 0;
     }
   }
 
