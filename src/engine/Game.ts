@@ -14,6 +14,7 @@ import { EnemyManager } from "./EnemyManager";
 import { ProjectileManager } from "./ProjectileManager";
 import { DamageNumbers } from "./DamageNumbers";
 import { ParticleManager } from "./ParticleManager";
+import { Bar } from "./Bar";
 
 /**
  * Game — 애플리케이션의 코어.
@@ -63,6 +64,20 @@ export class Game {
     style: { fill: 0x9ad0ff, fontSize: 14, fontFamily: "monospace" },
   });
 
+  // Graphics 기반 HUD 바(체력=초록, 경험치=파랑).
+  private readonly hpBar = new Bar(220, 16, 0x5ad46a);
+  private readonly xpBar = new Bar(220, 10, 0x4aa3ff);
+  // 화면 중앙에 잠깐 뜨는 메시지(레벨업 등).
+  private readonly message = new Text({
+    style: { fill: 0xffe066, fontSize: 40, fontFamily: "monospace", fontWeight: "bold" },
+  });
+  private messageTimer = 0;
+
+  // XP/레벨 상태.
+  private xp = 0;
+  private level = 1;
+  private xpToNext = 6;
+
   async init(mount: HTMLElement): Promise<void> {
     await this.app.init({
       resizeTo: mount,
@@ -101,19 +116,24 @@ export class Game {
       this.enemies,
       (x, y, dmg) => this.damageNumbers.spawn(x, y, dmg),
       (x, y) => {
-        // 적 사망: 파티클 버스트 + 짧은 화면 흔들림
+        // 적 사망: 파티클 버스트 + 짧은 화면 흔들림 + 경험치 획득
         this.particles.burst(x, y, 0xff6a6a, 12);
         this.camera.shake(4, 8);
+        this.gainXp(1);
       },
     );
 
     // 붉은 플래시 색상(곱셈 tint)을 필터에 한 번만 설정. 강도는 alpha로 조절.
     this.hurtFilter.tint(0xff2020, false);
 
-    // HUD: 라벨을 화면 좌상단에 고정.
+    // HUD: 좌상단에 라벨 + 바(hud는 카메라와 무관하게 화면 고정).
     this.label.position.set(12, 12);
     this.stats.position.set(12, 34);
-    this.hud.addChild(this.label, this.stats);
+    this.hpBar.position.set(12, 58);
+    this.xpBar.position.set(12, 80);
+    this.message.anchor.set(0.5);
+    this.message.visible = false;
+    this.hud.addChild(this.label, this.stats, this.hpBar, this.xpBar, this.message);
     this.setModeLabel(this.camera.mode);
 
     // 카메라 모드 순환(C키). keydown은 OS 키반복으로 연속 발생하므로 e.repeat로 1회만.
@@ -170,12 +190,48 @@ export class Game {
       ticker.deltaTime,
     );
 
-    // 7) HUD 갱신
+    // 7) HUD 갱신: 바(scale로 저렴하게) + 통계 텍스트 + 중앙 메시지
+    this.hpBar.setRatio(this.player.hp / this.player.maxHp);
+    this.xpBar.setRatio(this.xp / this.xpToNext);
     this.stats.text =
-      `HP: ${Math.max(0, Math.round(this.player.hp))}/${this.player.maxHp}   ` +
-      `킬: ${this.enemies.killCount}   적: ${this.enemies.activeCount}   ` +
-      `탄: ${this.projectiles.activeCount}   FPS: ${Math.round(this.app.ticker.FPS)}`;
+      `Lv ${this.level}   킬: ${this.enemies.killCount}   적: ${this.enemies.activeCount}   ` +
+      `FPS: ${Math.round(this.app.ticker.FPS)}`;
+    this.updateMessage(ticker.deltaTime);
   };
+
+  /** 경험치 획득 → 임계치를 넘으면 레벨업(여러 번 넘칠 수도 있어 while). */
+  private gainXp(amount: number): void {
+    this.xp += amount;
+    while (this.xp >= this.xpToNext) {
+      this.xp -= this.xpToNext;
+      this.level++;
+      this.xpToNext = Math.round(this.xpToNext * 1.35); // 다음 레벨은 더 많이 필요
+      this.onLevelUp();
+    }
+  }
+
+  private onLevelUp(): void {
+    // 보상: 발사 속도 증가(최소 4). + 골드 파티클 + 흔들림 + 중앙 메시지.
+    this.projectiles.fireInterval = Math.max(4, this.projectiles.fireInterval - 1);
+    this.particles.burst(this.player.x, this.player.y, 0xffe066, 24);
+    this.camera.shake(8, 12);
+    this.showMessage(`LEVEL ${this.level}!`);
+  }
+
+  private showMessage(text: string): void {
+    this.message.text = text;
+    this.messageTimer = 80;
+    this.message.visible = true;
+  }
+
+  /** 중앙 메시지를 화면 중앙에 고정하고 서서히 사라지게 한다(hud라 카메라 무관). */
+  private updateMessage(delta: number): void {
+    if (this.messageTimer <= 0) return;
+    this.message.position.set(this.app.screen.width / 2, this.app.screen.height / 2 - 120);
+    this.messageTimer -= delta;
+    this.message.alpha = Math.min(1, this.messageTimer / 25);
+    if (this.messageTimer <= 0) this.message.visible = false;
+  }
 
   /**
    * 붉은 피격 플래시. 필터는 렌더 패스를 추가하므로, 플래시 중에만 world.filters에 붙이고

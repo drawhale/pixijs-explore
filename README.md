@@ -58,4 +58,5 @@ src/
 - [x] Stage 3 — 적 대량 스폰 & 추적 (오브젝트 풀링 + 텍스처 재활용/tint 배칭)
 - [x] Stage 4 — 자동 공격 · 투사체 · 원-원 충돌 · 적 HP/사망 · Text 데미지 숫자
 - [x] Stage 5 — 사망 파티클 · ColorMatrixFilter 피격 플래시 · 화면 흔들림
-- [ ] Stage 6 — HUD · 체력/경험치 바 · 레벨업 (Graphics)
+- [x] Stage 6 — Graphics 체력/경험치 바(마스크) · XP/레벨업 · 중앙 메시지
+- [ ] Stage 7 — 성능 최적화 (수천 마리): 컬링 · ParticleContainer · 프로파일링

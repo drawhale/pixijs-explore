@@ -2,7 +2,6 @@ import type { Container } from "pixi.js";
 import { Projectile } from "../entities/Projectile";
 import type { EnemyManager } from "./EnemyManager";
 
-const FIRE_INTERVAL = 16; // 발사 간격(프레임)
 const PROJECTILE_SPEED = 7;
 const PROJECTILE_LIFE = 70; // 수명(프레임)
 const DAMAGE = 25;
@@ -21,6 +20,8 @@ export class ProjectileManager {
   private readonly active: Projectile[] = [];
   private readonly pool: Projectile[] = [];
   private fireCooldown = 0;
+  /** 발사 간격(프레임). 레벨업으로 줄어든다(=발사 빨라짐). */
+  fireInterval = 16;
 
   constructor(
     private readonly layer: Container,
@@ -40,7 +41,7 @@ export class ProjectileManager {
     if (this.fireCooldown <= 0) {
       const target = this.enemies.nearest(player.x, player.y);
       if (target) {
-        this.fireCooldown = FIRE_INTERVAL;
+        this.fireCooldown = this.fireInterval;
         this.fire(player, target);
       }
     }
